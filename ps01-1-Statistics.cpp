@@ -39,16 +39,3 @@ ostream& operator<<(ostream& stream, const Avg& avg) {
     stream << avg.avg << endl << avg.var << endl;
     return stream;
 }
-
-/*
-int main()
-{
-    Avg avg;
-    double x;
-    while ((cin >> x)) {
-        avg += x;
-    }
-    cout << avg;
-    return 0;
-}
-*/

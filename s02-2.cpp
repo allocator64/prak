@@ -20,6 +20,7 @@ class Function {
     function<double(double)> func;
     int id;
 public:
+    Function() :func(), id() {}
     Function(std::function<double(double)>, int);
     double calc(double) const;
     int get_id() const;
@@ -62,9 +63,14 @@ public:
 };
 
 int main() {
-    vector<Function> v;
-    for (int i = 1; i <= 10; ++i)
-        v.push_back(Function(func_list[i - 1], i));
+    vector<Function> v(10);
+    {
+        int cnt = 0;
+        transform(func_list.begin(), func_list.end(), v.begin(),
+            [&cnt](const function<double(double)> &f){
+                return Function(f, ++cnt);
+            });
+    }
     int t;
     double y, z;
     cin >> t >> y >> z;
@@ -75,8 +81,8 @@ int main() {
         sort(v.rbegin(), v.rend(), Compare2(y));
 
     double val = z;
-    for (vector<Function>::const_iterator it = v.begin(); it != v.end(); ++it)
-        val = it->calc(val);
+
+    val = accumulate(v.begin(), v.end(), val, [](double x, Function f) { return f.calc(x); });
 
     cout.precision(10);
     cout << val << endl;
