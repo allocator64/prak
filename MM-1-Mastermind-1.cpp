@@ -5,6 +5,8 @@
 #include <string>
 #include <cassert>
 #include <sstream>
+#include <algorithm>
+#include <iterator>
 
 using std::vector;
 using std::cout;
@@ -26,8 +28,8 @@ class Game {
 
     void promt() const;
     vector<int> load() const;
-    TurnResult check(const vector<int> &test) const;
-    bool is_valid(const vector<int> &v) const;
+    TurnResult check(const vector<int>) const;
+    bool is_valid(const vector<int> &) const;
 
 public:
     Game(int, int);
@@ -41,9 +43,8 @@ struct Game::TurnResult {
     TurnResult(int b, int w) :black(b), white(w) {}
 };
 
-Game::Game(int l=4, int c=6) :len(l), colors(c), counter(), finished(), codeword() {
-    for (int i = 0; i < len; ++i)
-        codeword.push_back(rand() % colors);
+Game::Game(int l=4, int c=6) :len(l), colors(c), counter(), finished(), codeword(l) {
+    std::generate(codeword.begin(), codeword.end(), [this](){ return (rand() % colors) + 1; });
 }
 
 void Game::promt() const {
@@ -53,48 +54,27 @@ void Game::promt() const {
 }
 
 vector<int> Game::load() const {
-    string s;
-    std::getline(std::cin, s);
-    stringstream ss(s);
     vector<int> v;
-    if (colors < 10) {
-        char ch;
-        while (ss >> ch)
-            v.push_back(ch - '1');
-    } else {
-        int k;
-        while (ss >> k)
-            v.push_back(k - 1);
-    }
+    std::copy_n(std::istream_iterator<int>(cin), len, std::back_inserter(v));
     return v;
 }
 
 bool Game::is_valid(const vector<int> &v) const {
-    if (v.size() != len)
-        return 0;
-    for (vector<int>::const_iterator it = v.begin(); it != v.end(); ++it)
-        if (!(0 <= *it && *it < colors))
-            return 0;
-    return 1;
+    return v.size() == len && std::find_if_not(v.begin(), v.end(), [this](int x){ return 0 < x && x <= colors; }) == v.end();
 }
 
-Game::TurnResult Game::check(const vector<int> &test) const {
-    vector<int> code_used(len, 0), test_used(len, 0);
-    int black = 0;
-    int white = 0;
-    for (int i = 0; i < len; ++i)
-        if (test[i] == codeword[i]) {
-            test_used[i] = code_used[i] = 1;
-            black++;
-        }
-    for (int i = 0; i < len; ++i)
-        if (!code_used[i])
-            for (int j = 0; j < len; ++j)
-                if (test[j] == codeword[i]) {
-                    code_used[i] = test_used[j] = 1;
-                    white++;
-                    break;
-                }
+Game::TurnResult Game::check(vector<int> test) const {
+    std::vector<int> code(codeword);
+    std::transform(code.begin(), code.end(), test.begin(), test.begin(), [](int a, int b){ return a == b ? 0 : b; });
+    std::transform(code.begin(), code.end(), test.begin(), code.begin(), [](int a, int b){ return b == 0 ? 0 : a; });
+    int black = std::count(code.begin(), code.end(), 0);
+    int white = std::count_if(test.begin(), test.end(), [&code](int b){
+        if (b == 0) return 0;
+        auto it = find(code.begin(), code.end(), b);
+        if (it == code.end()) return 0;
+        *it = 0;
+        return 1;
+    });
     return TurnResult(black, white);
 }
 
