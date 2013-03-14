@@ -63,10 +63,10 @@ public:
 };
 
 int main() {
-    vector<Function> v(10);
+    vector<Function> v;
     {
         int cnt = 0;
-        transform(func_list.begin(), func_list.end(), v.begin(),
+        transform(func_list.begin(), func_list.end(), back_inserter(v),
             [&cnt](const function<double(double)> &f){
                 return Function(f, ++cnt);
             });
