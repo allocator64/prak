@@ -7,15 +7,14 @@
 #include <sstream>
 #include <algorithm>
 #include <iterator>
+#include <array>
+
 
 using std::vector;
 using std::cout;
 using std::cin;
 using std::cerr;
 using std::endl;
-using std::string;
-using std::stringstream;
-
 
 class Game {
     int len, colors;
@@ -26,15 +25,12 @@ class Game {
 
     struct TurnResult;
 
-    void promt() const;
-    vector<int> load() const;
     TurnResult check(const vector<int>) const;
     bool is_valid(const vector<int> &) const;
 
 public:
-    Game(int, int);
-    bool has_finished() const;
-    void next_turn();
+    Game(int l=4, int c=6);
+    bool next_turn(const vector<int> &);
     int get_turns_count() const;
 };
 
@@ -43,24 +39,12 @@ struct Game::TurnResult {
     TurnResult(int b, int w) :black(b), white(w) {}
 };
 
-Game::Game(int l=4, int c=6) :len(l), colors(c), counter(), finished(), codeword(l) {
+Game::Game(int l, int c) :len(l), colors(c), codeword(l), counter(), finished() {
     std::generate(codeword.begin(), codeword.end(), [this](){ return (rand() % colors) + 1; });
 }
 
-void Game::promt() const {
-    if (counter == 0)
-        cout << "Input " << len << " numbers, each from 1 to " << colors << endl;
-    cout << "Attempt #" << counter + 1 << ": ";
-}
-
-vector<int> Game::load() const {
-    vector<int> v;
-    std::copy_n(std::istream_iterator<int>(cin), len, std::back_inserter(v));
-    return v;
-}
-
 bool Game::is_valid(const vector<int> &v) const {
-    return v.size() == len && std::find_if_not(v.begin(), v.end(), [this](int x){ return 0 < x && x <= colors; }) == v.end();
+    return int(v.size()) == len && std::find_if_not(v.begin(), v.end(), [this](int x){ return 0 < x && x <= colors; }) == v.end();
 }
 
 Game::TurnResult Game::check(vector<int> test) const {
@@ -68,7 +52,7 @@ Game::TurnResult Game::check(vector<int> test) const {
     std::transform(code.begin(), code.end(), test.begin(), test.begin(), [](int a, int b){ return a == b ? 0 : b; });
     std::transform(code.begin(), code.end(), test.begin(), code.begin(), [](int a, int b){ return b == 0 ? 0 : a; });
     int black = std::count(code.begin(), code.end(), 0);
-    int white = std::count_if(test.begin(), test.end(), [&code](int b){
+    int white = std::count_if(test.begin(), test.end(), [&code](int b) -> bool {
         if (b == 0) return 0;
         auto it = find(code.begin(), code.end(), b);
         if (it == code.end()) return 0;
@@ -78,9 +62,7 @@ Game::TurnResult Game::check(vector<int> test) const {
     return TurnResult(black, white);
 }
 
-void Game::next_turn() {
-    promt();
-    vector<int> test = load();
+bool Game::next_turn(const vector<int> &test) {
     if (is_valid(test)) {
         ++counter;
         TurnResult result = check(test);
@@ -90,23 +72,40 @@ void Game::next_turn() {
     } else {
         cout << "Incorrect input, please, try again" << endl;
     }
+    return finished;
 }
 
 int Game::get_turns_count() const {
     return counter;
 }
 
-bool Game::has_finished() const {
-    return finished;
+template<class T, int n>
+struct Array
+{
+    vector<int> v;
+    Array() :v() {}
+};
+
+template<class T, int n>
+std::istream& operator>>(std::istream &in, Array<T, n> &a)
+{
+    a.v.clear();
+    std::copy_n(std::istream_iterator<T>(cin), n, std::back_inserter(a.v));
+    return in;
 }
 
 int main() {
+
     srand(time(0));
 
-    Game game(2, 15);
+    enum { N = 4, M = 6 };
 
-    while (!game.has_finished())
-        game.next_turn();
+    Game game(N, M);
+
+    find_if(std::istream_iterator<Array<int, N>>(cin),
+        std::istream_iterator<Array<int, N>>(),[&game](const Array<int, N> &a) {
+            return game.next_turn(a.v);
+        });
 
     cout << "Finished" << endl << "Attempt: " << game.get_turns_count() << endl;
 
