@@ -75,8 +75,9 @@ public:
     explicit MutableDateFormatter(int k) :rep(DateFormatter::get_formatter(k)) {}
     void toType(int k)
     {
-        delete rep;
-        rep = DateFormatter::get_formatter(k);
+        DateFormatter *tmp = DateFormatter::get_formatter(k);
+        std::swap(tmp, rep);
+        delete tmp;
     }
     std::string printDate(const std::tm &t) const
     {

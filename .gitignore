@@ -1,3 +1,6 @@
 *out
 *.dSYM
 .DS_Store
+*.o
+Makefile
+
