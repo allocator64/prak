@@ -1,143 +1,178 @@
 #include <iostream>
-#include <vector>
-#include <set>
+#include <string>
+#include <unordered_set>
+#include <algorithm>
+#include <iterator>
+#include <functional>
 
 using namespace std;
 
-class Rule
-{
-public:
-    Rule() :from(), to(), color() {}
-    Rule(char f, string t, unsigned c) :from(f), to(t), color(c) {}
+struct Rule {
     char from;
     string to;
-    unsigned color;
+    Rule() :from(), to() {}
+    Rule(const char _from, const string &_to) : from(_from), to(_to) {}
+    friend istream & operator >> (istream & in, Rule &G)
+    {
+        in >> G.from >> G.to;
+        return in;
+    }
+    bool operator < (const Rule &a)
+    {
+        return from < a.from || (from == a.from && to < a.to);
+    }
 };
 
-vector<Rule> v;
-vector<int> x(256);
-vector<Rule> w;
-
-vector<int> n(256);
-
-void dfs(Rule &cur)
+bool is_eps_r(const Rule &r)
 {
-    cur.color |= 2;
-    for (auto &c : cur.to)
-        if (isupper(c))
-            for (auto &p : w)
-                if ((p.color & 2) == 0 && p.from == c)
-                    dfs(p);
+    return ('A' <= r.from && r.from <= 'Z' && r.to == "_");
 }
 
+inline bool is_term_itm(const char c)
+{
+    return c >= 'a' && c <= 'z';
+}
+
+unordered_set<char> get_eps_r(const vector<Rule> &G)
+{
+    unordered_set<char> res;
+
+    for(auto &i : G)
+        if(is_eps_r(i))
+            res.insert(i.from);
+
+    while( 1 ) {
+        auto sz = res.size();
+        for(auto &i : G)
+            if(find_if_not(i.to.begin(), i.to.end(), [&res](char c) -> bool
+            {
+                return static_cast<bool>(res.count(c));
+            }) == i.to.end())
+                res.insert(i.from);
+
+        if(sz == res.size())
+            break;
+    }
+    return res;
+}
+
+vector<Rule> morph_r(const Rule &r, const unordered_set<char> &e_gen)
+{
+    vector<Rule> res;
+    string curr;
+    function<void(size_t)> solve = [&solve, &r, &e_gen, &res, &curr](size_t ind) {
+        if(ind == r.to.size()) {
+            if(curr != "")
+                res.push_back(Rule(r.from, curr));
+        } else if(e_gen.count(r.to[ind])) {
+            curr += r.to[ind];
+            solve(ind + 1);
+            curr.pop_back();
+            solve(ind + 1);
+        } else {
+            curr += r.to[ind];
+            solve(ind + 1);
+            curr.pop_back();
+        }
+    };
+
+    solve(0);
+
+    return res;
+}
+
+bool cut_eps_r(vector<Rule> &G)
+{
+    auto e_gen = get_eps_r(G);
+
+    vector<Rule> res;
+    for(auto &i : G) {
+        if(is_eps_r(i))
+            continue;
+        auto v = morph_r(i, e_gen);
+        res.insert(res.end(), v.begin(), v.end());
+    }
+
+    bool changed = false;
+
+    if(e_gen.count('S')) {
+        res.push_back(Rule('$', "_"));
+        res.push_back(Rule('$', "S"));
+        changed = true;
+    }
+
+    G = res;
+
+    return changed;
+}
+
+void cut_end(vector<Rule> &G)
+{
+    unordered_set<char> ok;
+    while(true) {
+        auto sz = ok.size();
+        for(auto r : G) {
+            bool f = true;
+            for(auto c : r.to) {
+                if('A' <= c && c <= 'Z' && !ok.count(c)) {
+                    f = false;
+                    break;
+                }
+            }
+            if(f)
+                ok.insert(r.from);
+        }
+        if(sz == ok.size())
+            break;
+    }
+    vector<Rule> tmp;
+    for(auto r : G) {
+        if(!ok.count(r.from))
+            continue;
+        if(find_if(r.to.begin(), r.to.end(), [&ok](char c) -> bool {
+            return 'A' <= c && c <= 'Z' && !ok.count(c);
+        }) == r.to.end())
+            tmp.push_back(r);
+    }
+    G = tmp;
+}
+
+void cut_next(vector<Rule> &G, char start = 'S')
+{
+    unordered_set<char> H;
+    H.insert(start);
+
+    while(true) {
+        auto sz = H.size();
+        for(auto &i : G) {
+            if(H.count(i.from))
+                for(auto &c : i.to)
+                    if(!is_term_itm(c))
+                        H.insert(c);
+        }
+        if(sz == H.size())
+            break;
+    }
+
+    vector<Rule> tmp;
+
+    for(auto &i : G)
+        if(H.count(i.from))
+            tmp.push_back(i);
+    G = tmp;
+}
 
 int main()
 {
-    ios_base::sync_with_stdio(0);
+    vector<Rule> G;
+    copy(istream_iterator<Rule>(cin), istream_iterator<Rule>(), back_inserter(G));
 
-    Rule t;
-    while (cin >> t.from >> t.to)
-        v.push_back(t);
+    bool f = cut_eps_r(G);
+    cut_end(G);
+    cut_next(G, f ? '$' : 'S');
 
-    for (auto &i : v) {
-        size_t pos = 0;
-        while ((pos = i.to.find('_')) != string::npos)
-            i.to.erase(pos);
-    }
-    
-    for (auto &i : v)
-        if (i.to == "")
-            x[i.from] = 1;
-
-    size_t cur = 0;
-    size_t last = -1;
-    while (cur != last) {
-        last = cur;
-        for (auto &i : v)
-            if (x[i.from] == 0) {
-                bool ok = 1;
-                for (auto &c : i.to)
-                    if (!isupper(c) || x[c] == 0){
-                        ok = 0;
-                        break;
-                    }
-                x[i.from] = ok;
-                cur += ok;
-            }
-    }
-    for (auto &i : v)
-        if (i.to != "")
-            w.push_back(i);
-    char S = 'S';
-    if (x[S]) {
-        S = '$';
-        w.push_back(Rule('$', "S", 0));
-        w.push_back(Rule('$', "", 0));
-    }
-    for (auto &r : w)
-        if (r.color == 0) {
-            vector<string> alpha;
-            vector<char> A;
-            string curs;
-            size_t len = 0;
-            for (auto &c : r.to)
-                if (x[c] == 0)
-                    curs += c;
-                else {
-                    alpha.push_back(curs);
-                    len += curs.size();
-                    curs = "";
-                    A.push_back(c);
-                }
-            unsigned long long mask = 0;
-            if (len == 0)
-                mask = 1;
-            for (; mask < (1ull << A.size()) - 1; ++mask) {
-                string to = alpha[0];
-                for (size_t i = 0; i < A.size(); ++i){
-                    if (mask & (1ull << i))
-                        to += A[i];
-                    to += alpha[i + 1];
-                }
-                w.push_back(Rule(r.from, to, 1));
-            }
-        }
-
-    for (auto &i : w)
-        if (i.from == 'S')
-            dfs(i);    
-
-    cur = 0;
-    last = -1;
-    while (cur != last) {
-        last = cur;
-        for (auto &i : w)
-            if (n[i.from] == 0) {
-                bool ok = 1;
-                for (auto &c : i.to)
-                    if (isupper(c) && n[c] == 0){
-                        ok = 0;
-                        break;
-                    }
-                n[i.from] = ok;
-                cur += ok;
-            }
-    }
-
-    for (auto &i : w)
-        if ((i.color & 2) && n[i.from]) {
-            bool ok = 1;
-            for (auto &c : i.to)
-                if (isupper(c) && n[c] == 0) {
-                    ok = 0;
-                    break;
-                }
-            if (ok) {
-                if (i.to == "")
-                    i.to = "_";
-                cout << i.from << " " << i.to << "\n";
-            }
-        }
+    for (auto &i : G)
+        cout << i.from << " " << i.to << endl;
 
     return 0;
 }
