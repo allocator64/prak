@@ -1,0 +1,130 @@
+#include <iostream>
+#include <string>
+#include <vector>
+#include <set>
+#include <map>
+#include <utility>
+
+using std::string;
+using std::set;
+using std::map;
+using std::pair;
+using std::cin;
+using std::cout;
+using std::endl;
+using std::ostream;
+
+typedef set<char> elem_t;
+
+class MachineGun {
+    static const elem_t beg_st;
+    static const elem_t add_st;
+    map<pair<elem_t, char>, elem_t> go;
+    set<elem_t> non_term;
+    elem_t eps, alph;
+    void read_gram();
+ public:
+    MachineGun();
+    void out_alph();
+    void delete_right_eps();
+    void determinise();
+    friend std::ostream &operator<<(ostream &, MachineGun &);
+};
+
+const elem_t MachineGun::beg_st {'A' - 1};
+const elem_t MachineGun::add_st {'Z' + 1};
+
+MachineGun::MachineGun() {
+    read_gram();
+}
+
+void MachineGun::read_gram() {
+    non_term.insert(beg_st);
+    non_term.insert(add_st);
+    char from;
+    string to;
+    while ((cin >> from >> to)) {
+        non_term.insert(elem_t {from});
+        if (to == "_")
+            eps.insert(from);
+        else if (to.size() == 2) {
+            non_term.insert(elem_t {to[0]});
+            alph.insert(to[1]);
+            go[make_pair(elem_t {to[0]}, to[1])].insert(from);
+        } else {
+            alph.insert(to[0]);
+            go[make_pair(beg_st, to[0])].insert(from);
+        }
+    }
+}
+
+void MachineGun::out_alph() {
+    for (auto &i : alph)
+        cout << i;
+    cout << endl;
+}
+
+void MachineGun::delete_right_eps() {
+    for (auto &i : eps)
+        for (auto &j : alph) {
+            auto cp = make_pair(elem_t {i}, j);
+            if (go.find(cp) != go.end())
+                go[make_pair(beg_st, j)] = go[cp];
+        }
+}
+
+void MachineGun::determinise() {
+    bool changes = true;
+    while (changes) {
+        changes = false;
+        for (auto &f : go) {
+            if (f.second.size() && non_term.find(f.second) == non_term.end()) {
+                changes = true;
+                for (auto &letter : alph) {
+                    auto cur = make_pair(f.second, letter);
+                    for (auto &i : f.second) {
+                        auto add = make_pair(elem_t {i}, letter);
+                        go[cur].insert(go[add].begin(), go[add].end());
+                    }
+                }
+                non_term.insert(f.second);
+            }
+        }
+    }
+}
+
+ostream &operator<<(ostream &out, MachineGun &mg) {
+    int count_end = (mg.eps.find('S') != mg.eps.end());
+    for (auto &i : mg.non_term)
+        count_end += (i.find('S') != i.end());
+    out << mg.non_term.size() << endl;
+    out << distance(mg.non_term.begin(), mg.non_term.find(mg.beg_st)) + 1 << " ";
+    out << count_end << " ";
+    for (auto i = mg.non_term.begin(); i != mg.non_term.end(); ++i)
+        if (i->find('S') != i->end())
+            out << distance(mg.non_term.begin(), i) + 1 << " ";
+    if (mg.eps.find('S') != mg.eps.end())
+        out << distance(mg.non_term.begin(), mg.non_term.find(mg.beg_st)) + 1;
+    out << endl;
+    auto num_add_st = distance(mg.non_term.begin(), mg.non_term.find(mg.add_st)) + 1;
+    for (auto &i : mg.non_term) {
+        for (auto &j : mg.alph) {
+            auto cp = make_pair(i, j);
+            if (mg.go.find(cp) != mg.go.end() && mg.non_term.find(mg.go[cp]) != mg.non_term.end())
+                out << distance(mg.non_term.begin(), mg.non_term.find(mg.go[cp])) + 1 << " ";
+            else
+                out << num_add_st << " ";
+        }
+        out << endl;
+    }
+    return out;
+}
+
+int main() {
+    MachineGun mg;
+    mg.out_alph();
+    mg.delete_right_eps();
+    mg.determinise();
+    cout << mg;
+    return 0;
+}
